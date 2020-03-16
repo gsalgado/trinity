@@ -34,21 +34,19 @@ class AsyncioIsolatedComponent(BaseIsolatedComponent):
         async with proc_ctx as proc:
             try:
                 await proc.wait_result()
-            except asyncio.CancelledError as err:
-                logger.debug('Component %s exiting. Sending SIGINT to pid=%d', self, proc.pid)
+            except asyncio.CancelledError:
+                logger.info('Component %s exiting. Sending SIGINT to pid=%d', self, proc.pid)
                 proc.send_signal(signal.SIGINT)
                 try:
                     await asyncio.wait_for(proc.wait(), timeout=2)
                 except asyncio.TimeoutError:
-                    logger.debug(
+                    logger.info(
                         'Component %s running in process pid=%d timed out '
                         'during shutdown. Sending SIGTERM and exiting.',
                         self,
                         proc.pid,
                     )
                     proc.send_signal(signal.SIGTERM)
-                finally:
-                    raise err
 
     @classmethod
     async def _do_run(cls, boot_info: BootInfo) -> None:
