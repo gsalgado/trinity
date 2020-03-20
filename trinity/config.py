@@ -621,7 +621,8 @@ class Eth1AppConfig(BaseAppConfig):
         Initialize from the namespace object produced by
         an ``argparse.ArgumentParser`` and the :class:`~trinity.config.TrinityConfig`
         """
-        return cls(trinity_config, args.sync_mode)
+        # return cls(trinity_config, args.sync_mode)
+        return cls(trinity_config, "full")
 
     @property
     def database_dir(self) -> Path:

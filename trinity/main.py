@@ -53,6 +53,7 @@ def trinity_boot(boot_info: BootInfo) -> Tuple[multiprocessing.Process]:
     trinity_config = boot_info.trinity_config
     ensure_eth1_dirs(trinity_config.get_app_config(Eth1AppConfig))
 
+    return []
     logger = logging.getLogger('trinity')
 
     # First initialize the database process.

@@ -35,21 +35,42 @@ class AsyncioIsolatedComponent(BaseIsolatedComponent):
             try:
                 await proc.wait_result()
             except asyncio.CancelledError:
-                logger.info('Component %s exiting. Sending SIGINT to pid=%d', self, proc.pid)
+                logger.exception('Component %s exiting. Sending SIGINT to pid=%d', self, proc.pid)
                 proc.send_signal(signal.SIGINT)
                 try:
                     await asyncio.wait_for(proc.wait(), timeout=2)
-                except asyncio.TimeoutError:
+                except asyncio.TimeoutError as exc:
                     logger.info(
                         'Component %s running in process pid=%d timed out '
-                        'during shutdown. Sending SIGTERM and exiting.',
+                        'during shutdown. Sending SIGTERM and exiting: %s',
                         self,
                         proc.pid,
+                        exc,
                     )
                     proc.send_signal(signal.SIGTERM)
 
+    # XXX
+    # This method never seems to return.
+    # Interesting things to notice.
+    # 1. After the SIGINT, both UPnPService2 and AsyncioEventBusService finish cleanly
+    # 2. asyncio_run_in_process: got_SIGINT is set twice:
+    #   2020-04-03 13:14:00,772  asyncio_run_in_process  <coroutine object AsyncioIsolatedComponent._do_run at 0x7f5497513a70> got SIGINT
+    #   2020-04-03 13:14:00,835  asyncio_run_in_process  <coroutine object AsyncioIsolatedComponent._do_run at 0x7f5497513a70> got SIGINT
+    # 3. After both services started by the component finish, the component seems to hang here,
+    #    until we reach the timeout and the component-manager sends a SIGTERM
+    # INFO  2020-04-03 13:14:00,841  Manager  <Manager[AsyncioEventBusService] flags=SrCFe>: finished
+    # INFO  2020-04-03 13:14:02,832  AsyncioIsolatedComponent  Component <Component[Upnp]> running in process pid=11890 timed out during shutdown. Sending SIGTERM and exiting:
     @classmethod
     async def _do_run(cls, boot_info: BootInfo) -> None:
+        try:
+            await cls._do_run2(boot_info)
+        except BaseException as e:
+            logger.exception("%s.do_run() got another exception", cls)
+        else:
+            logger.warning("%s.do_run() finished without any errors", cls)
+
+    @classmethod
+    async def _do_run2(cls, boot_info: BootInfo) -> None:
         with child_process_logging(boot_info):
             endpoint_name = cls.get_endpoint_name()
             event_bus_service = AsyncioEventBusService(
@@ -66,7 +87,12 @@ class AsyncioIsolatedComponent(BaseIsolatedComponent):
                     else:
                         await cls.do_run(boot_info, event_bus)
                 except KeyboardInterrupt:
+                    logger.warning("%s got KeyboardInterrupt, returning", cls)
                     return
+                except BaseException as e:
+                    logger.exception("%s got another exception: %r", cls)
+                else:
+                    logger.warning("%s finished without any errors", cls)
 
     @classmethod
     @abstractmethod

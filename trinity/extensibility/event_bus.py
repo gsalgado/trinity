@@ -70,7 +70,19 @@ class BaseEventBusService(Service):
             self._endpoint_available.set()
 
             # run until the endpoint exits
-            await self.manager.wait_finished()
+            try:
+                # When the UPNP component terminates, we try to leave the evbus context created in
+                # AsyncioIsolatedC, which calls manager.stop(), cancelling the service, causing
+                # a CancelledError here. And when that happens, the `await manager.stop()` in
+                # background_asyncio_service() hangs forever even though the service
+                # is marked as finished as I see in the logs
+                # <Manager[AsyncioEventBusService] flags=SrCFe>: finished
+                await self.manager.wait_finished()
+            except BaseException:
+                self.manager.logger.exception("%s: Unexpected error waiting to stop", self.manager)
+                raise
+            else:
+                self.manager.logger.warning("%s: finished", self.manager)
 
     async def _auto_connect_new_announced_endpoints(
         self,

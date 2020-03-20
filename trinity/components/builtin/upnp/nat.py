@@ -67,6 +67,8 @@ class UPnPService(Service):
         On every iteration we configure the port mapping with a lifetime of 30 minutes and then
         sleep for that long as well.
         """
+        self.manager.run_task(asyncio.sleep, 10000)
+        await self.manager.wait_finished()
         while self.manager.is_running:
             try:
                 external_ip = await self.add_nat_portmap()

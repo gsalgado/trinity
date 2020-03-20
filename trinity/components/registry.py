@@ -58,12 +58,12 @@ from trinity.components.builtin.tx_pool.component import (
 
 
 BASE_COMPONENTS: Tuple[Type[BaseComponentAPI], ...] = (
-    AttachComponent,
-    DbShellComponent,
-    FixUncleanShutdownComponent,
-    JsonRpcServerComponent,
-    NetworkDBComponent,
-    PeerDiscoveryComponent,
+    # AttachComponent,
+    # DbShellComponent,
+    # FixUncleanShutdownComponent,
+    # JsonRpcServerComponent,
+    # NetworkDBComponent,
+    # PeerDiscoveryComponent,
     UpnpComponent,
 )
 
@@ -76,18 +76,18 @@ BEACON_NODE_COMPONENTS: Tuple[Type[BaseComponentAPI], ...] = (
 
 
 ETH1_NODE_COMPONENTS: Tuple[Type[BaseComponentAPI], ...] = (
-    BeamChainExecutionComponent,
-    BeamChainPreviewComponent0,
-    BeamChainPreviewComponent1,
-    BeamChainPreviewComponent2,
-    BeamChainPreviewComponent3,
-    EthstatsComponent,
-    ExportBlockComponent,
-    ImportBlockComponent,
-    MetricsComponent,
-    RequestServerComponent,
-    SyncerComponent,
-    TxComponent,
+    # BeamChainExecutionComponent,
+    # BeamChainPreviewComponent0,
+    # BeamChainPreviewComponent1,
+    # BeamChainPreviewComponent2,
+    # BeamChainPreviewComponent3,
+    # EthstatsComponent,
+    # ExportBlockComponent,
+    # ImportBlockComponent,
+    # MetricsComponent,
+    # RequestServerComponent,
+    # SyncerComponent,
+    # TxComponent,
 )
 
 

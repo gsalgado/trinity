@@ -123,6 +123,8 @@ class BaseService(CancellableMixin, AsyncioServiceAPI):
             raise
         except Exception:
             self.logger.exception("Unexpected error in %r, exiting", self)
+        except KeyboardInterrupt:
+            self.logger.exception("KeyboardInterrupt in %r (BaseService), exiting", self)
         else:
             if self.is_cancelled:
                 self.logger.debug("%s cancelled, cleaning up...", self)

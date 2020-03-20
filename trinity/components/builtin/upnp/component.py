@@ -3,7 +3,8 @@ from argparse import (
     _SubParsersAction,
 )
 
-from async_service import run_asyncio_service
+from async_service import background_asyncio_service
+from async_service import Service
 from lahja import EndpointAPI
 
 from trinity.boot_info import BootInfo
@@ -38,10 +39,27 @@ class UpnpComponent(AsyncioIsolatedComponent):
 
     @classmethod
     async def do_run(cls, boot_info: BootInfo, event_bus: EndpointAPI) -> None:
-        port = boot_info.trinity_config.port
-        upnp_service = UPnPService(port, event_bus)
+        # upnp_service = UPnPService(boot_info.trinity_config.port, event_bus)
+        upnp_service = UPnPService2()
 
-        await run_asyncio_service(upnp_service)
+        async with background_asyncio_service(upnp_service) as manager:
+            try:
+                await manager.wait_finished()
+            except BaseException as e:
+                manager.logger.warning("%s got another exception: %r", cls, e)
+            else:
+                manager.logger.warning("%s finished without any errors", cls)
+
+
+class UPnPService2(Service):
+
+    async def run(self) -> None:
+        import asyncio
+        import time
+        while self.manager.is_running:
+            for _ in range(10):
+                time.sleep(0.01)
+            await asyncio.sleep(0.1)
 
 
 if __name__ == "__main__":
