@@ -135,7 +135,7 @@ async def _do_p2p_handshake(transport: TransportAPI,
 
     # The base `p2p` protocol handshake directly streams the messages as it has
     # strict requirements about receiving the `Hello` message first.
-    async for _, cmd in stream_transport_messages(transport, base_protocol):
+    async for proto, cmd in stream_transport_messages(transport, base_protocol):
         if isinstance(cmd, Disconnect):
             if cmd.payload == DisconnectReason.TOO_MANY_PEERS:
                 raise HandshakeFailureTooManyPeers(f"Peer disconnected because it is already full")

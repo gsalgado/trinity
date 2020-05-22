@@ -245,10 +245,11 @@ class Transport(TransportAPI):
         try:
             padded_header = self._decrypt_header(header_bytes)
         except DecryptionError as err:
-            self.logger.debug(
+            self.logger.info(
                 "Bad message header from peer %s: Error: %r",
                 self, err,
             )
+            # import pdb; pdb.set_trace()  # noqa: E702,E262
             raise MalformedMessage(*err.args) from err
         # TODO: use `int.from_bytes(...)`
         frame_size = self._get_frame_size(padded_header)
@@ -259,7 +260,7 @@ class Transport(TransportAPI):
         try:
             body = self._decrypt_body(frame_data, frame_size)
         except DecryptionError as err:
-            self.logger.debug(
+            self.logger.info(
                 "Bad message body from peer %s: Error: %r",
                 self, err,
             )
