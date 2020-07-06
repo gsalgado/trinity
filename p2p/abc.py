@@ -624,6 +624,7 @@ class ConnectionAPI(ServiceAPI):
     #
     # Primary properties of the connection
     #
+    behaviors_applied: asyncio.Event
     is_dial_out: bool
 
     @property

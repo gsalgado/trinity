@@ -154,7 +154,8 @@ async def test_eth_peer_get_headers_round_trip_with_noise(eth_peer_and_remote):
         remote.eth_api.send_block_headers(headers)
         await asyncio.sleep(0)
 
-    get_headers_task = asyncio.ensure_future(peer.chain_api.get_block_headers(0, 10, 0, False))
+    get_headers_task = asyncio.ensure_future(
+        peer.chain_api.get_block_headers(0, 10, 0, False))
     asyncio.ensure_future(send_responses())
 
     response = await get_headers_task

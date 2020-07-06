@@ -13,13 +13,10 @@ from typing import (
 
 from async_service import Service
 
-from cached_property import cached_property
-
 from lahja import EndpointAPI
 from pyformance.meters import SimpleGauge
 
 from eth_utils.toolz import (
-    excepts,
     groupby,
 )
 
@@ -39,7 +36,6 @@ from p2p.exceptions import (
     MalformedMessage,
     NoConnectedPeers,
     PeerConnectionLost,
-    UnknownAPI,
 )
 from p2p.metrics import (
     PeerReporterRegistry,
@@ -62,8 +58,7 @@ from p2p.tracking.connection import (
 
 from trinity.constants import TO_NETWORKING_BROADCAST_CONFIG
 from trinity.exceptions import BaseForkIDValidationError, ENRMissingForkID
-from trinity.protocol.common.abc import ChainInfoAPI, HeadInfoAPI
-from trinity.protocol.common.api import ChainInfo, HeadInfo, choose_eth_or_les_api, AnyETHLESAPI
+from trinity.protocol.common.api import ChainInfo, HeadInfo, choose_eth_or_les_api
 
 from trinity.protocol.eth.forkid import (
     extract_fork_blocks,
@@ -93,20 +88,15 @@ class BaseChainPeer(BasePeer):
     boot_manager_class = DAOCheckBootManager
     context: ChainContext
 
-    @cached_property
-    def chain_api(self) -> AnyETHLESAPI:
-        return choose_eth_or_les_api(self.connection)
+    def _pre_run(self) -> None:
+        super()._pre_run()
 
-    @cached_property
-    def head_info(self) -> HeadInfoAPI:
-        return self.connection.get_logic(HeadInfo.name, HeadInfo)
-
-    @cached_property
-    def chain_info(self) -> ChainInfoAPI:
-        return self.connection.get_logic(ChainInfo.name, ChainInfo)
+        self.chain_api = choose_eth_or_les_api(self.connection)
+        self.head_info = self.connection.get_logic(HeadInfo.name, HeadInfo)
+        self.chain_info = self.connection.get_logic(ChainInfo.name, ChainInfo)
 
     def get_behaviors(self) -> Tuple[BehaviorAPI, ...]:
-        return (
+        return super().get_behaviors() + (
             HeadInfo().as_behavior(),
             ChainInfo().as_behavior(),
         )
@@ -264,12 +254,7 @@ class BaseChainPeerPool(BasePeerPool):
         if not peers:
             raise NoConnectedPeers("No connected peers")
 
-        td_getter = excepts(
-            (PeerConnectionLost, UnknownAPI),
-            operator.attrgetter('head_info.head_td'),
-            lambda _: 0,
-        )
-        peers_by_td = groupby(td_getter, peers)
+        peers_by_td = groupby(operator.attrgetter('head_info.head_td'), peers)
         max_td = max(peers_by_td.keys())
         return random.choice(peers_by_td[max_td])
 

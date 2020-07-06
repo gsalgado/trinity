@@ -445,7 +445,7 @@ class SkeletonSyncer(Service, Generic[TChainPeer]):
             max_headers: int = None,
             skip: int = None) -> Tuple[BlockHeaderAPI, ...]:
 
-        if not peer.manager.is_running:
+        if not peer.is_alive:
             self.logger.info("%s disconnected while fetching headers", peer)
             return tuple()
 
@@ -703,9 +703,9 @@ class HeaderMeatSyncer(Service, PeerSubscriber, Generic[TChainPeer]):
             if not self.sync_progress:
                 await self._init_sync_progress(parent_header, peer)
 
-            if not peer.manager.is_running:
+            if not peer.is_alive:
                 self.logger.debug(
-                    "Tried to fetch headers from %s but it is no longer running", peer)
+                    "Tried to fetch headers from %s but it is no longer alive", peer)
                 continue
 
             peer.manager.run_task(
@@ -817,7 +817,8 @@ class HeaderMeatSyncer(Service, PeerSubscriber, Generic[TChainPeer]):
     ) -> Tuple[BlockHeaderAPI, ...]:
         self.logger.debug("Requesting %d headers from %s", length, peer)
         try:
-            return await peer.chain_api.get_block_headers(start_at, length, skip=0, reverse=False)
+            return await peer.chain_api.get_block_headers(
+                start_at, length, skip=0, reverse=False)
         except asyncio.TimeoutError:
             self.logger.debug("Timed out requesting %d headers from %s", length, peer)
             return tuple()
@@ -1057,7 +1058,10 @@ class BaseHeaderChainSyncer(Service, HeaderSyncerAPI, Generic[TChainPeer]):
     async def _validate_peer_is_ahead(self, peer: BaseChainPeer) -> None:
         head = await self._db.coro_get_canonical_head()
         head_td = await self._db.coro_get_score(head.hash)
-        if peer.head_info.head_td <= head_td:
+        # Since we yielded above, we could've lost the peer connection.
+        if not peer.is_alive:
+            raise _PeerBehind(f"{peer} is no longer alive, not a valid target for sync")
+        elif peer.head_info.head_td <= head_td:
             self.logger.debug(
                 "Head TD (%d) announced by %s not higher than ours (%d), not syncing",
                 peer.head_info.head_td, peer, head_td)

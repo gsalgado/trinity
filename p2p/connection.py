@@ -1,10 +1,12 @@
 import asyncio
 import collections
+import contextlib
 import functools
 from typing import (
     Any,
     DefaultDict,
     Dict,
+    List,
     Sequence,
     Set,
     Tuple,
@@ -20,6 +22,7 @@ from cached_property import cached_property
 from eth_keys import keys
 
 from p2p.abc import (
+    BehaviorAPI,
     CommandAPI,
     ConnectionAPI,
     HandlerFn,
@@ -45,6 +48,7 @@ from p2p.exceptions import (
     UnknownProtocol,
     UnknownProtocolCommand,
 )
+from p2p.logic import wait_first
 from p2p.subscription import Subscription
 from p2p.p2p_proto import BaseP2PProtocol, DevP2PReceipt, Disconnect
 from p2p.typing import Capabilities
@@ -91,6 +95,8 @@ class Connection(ConnectionAPI, Service):
         # before all necessary handlers have been added
         self._handlers_ready = asyncio.Event()
 
+        self.behaviors_applied = asyncio.Event()
+
         self._logics = {}
 
     def __str__(self) -> str:
@@ -102,6 +108,28 @@ class Connection(ConnectionAPI, Service):
     def start_protocol_streams(self) -> None:
         self._handlers_ready.set()
 
+    async def run_behaviors(self, behaviors: Tuple[BehaviorAPI, ...]) -> None:
+        async with contextlib.AsyncExitStack() as stack:
+            futures: List[asyncio.Future[None]] = [
+                asyncio.create_task(self.manager.wait_finished())]
+            for behavior in behaviors:
+                if behavior.should_apply_to(self):
+                    futures.append(await stack.enter_async_context(behavior.apply(self)))
+            self.behaviors_applied.set()
+            try:
+                await wait_first(futures)
+            except PeerConnectionLost:
+                # Any of our behaviors may propagate a PeerConnectionLost, which is to be expected
+                # as many Connection APIs used by them can raise that.
+                pass
+            finally:
+                if not self.manager.is_cancelled:
+                    # A behavior terminated before us, but its exception will be propagated
+                    # (unless it's a PeerConnectionLost, which is expected), so just cancel the
+                    # Connection as we run as a daemon and wouldn't want to cause a
+                    # DaemonTaskExit.
+                    self.manager.cancel()
+
     async def run_peer(self, peer: 'BasePeer') -> None:
         """
         Run the peer as a child service.
@@ -109,6 +137,9 @@ class Connection(ConnectionAPI, Service):
         A peer must always run as a child of the connection so that it has an open connection
         until it finishes its cleanup.
         """
+        self.manager.run_daemon_task(self.run_behaviors, peer.get_behaviors())
+        await self.behaviors_applied.wait()
+
         self.manager.run_daemon_child_service(peer)
         await asyncio.wait_for(peer.manager.wait_started(), timeout=PEER_READY_TIMEOUT)
         await asyncio.wait_for(peer.ready.wait(), timeout=PEER_READY_TIMEOUT)
@@ -277,6 +308,8 @@ class Connection(ConnectionAPI, Service):
 
     def has_logic(self, name: str) -> bool:
         if self.is_closing:
+            # This is a safety net, really, as the Peer should never call this if it is no longer
+            # alive.
             raise PeerConnectionLost("Cannot look up subprotocol when connection is closing")
         return name in self._logics
 
