@@ -86,10 +86,20 @@ async def stream_transport_messages(transport: TransportAPI,
         msg_proto = command_id_cache[command_id]
         command_type = msg_proto.get_command_type_for_command_id(command_id)
 
+        start = time.monotonic()
         try:
             cmd = command_type.decode(msg, msg_proto.snappy_support)
         except (rlp.exceptions.DeserializationError, snappy_CompressedLengthError) as err:
             raise MalformedMessage(f"Failed to decode {msg} for {command_type}") from err
+
+        decode_time = time.monotonic() - start
+        log = transport.logger.debug
+        if decode_time > 0.001:
+            log = transport.logger.info
+
+        encoded_len = len(msg.header) + len(msg.body)
+        log("Decoded %s (snappy=%s) in %.5f seconds; len=%d", command_type.__name__,
+            msg_proto.snappy_support, decode_time, encoded_len)
 
         yield msg_proto, cmd
 

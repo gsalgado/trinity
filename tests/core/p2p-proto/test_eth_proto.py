@@ -3,6 +3,7 @@ import secrets
 import pytest
 
 from trinity._utils.assertions import assert_type_equality
+from trinity._utils.timer import Timer
 from trinity.protocol.eth.commands import (
     BlockBodiesV65,
     BlockHeadersV65,
@@ -71,3 +72,25 @@ def test_les_protocol_command_round_trips(command_type, payload, snappy_support)
     assert isinstance(result, command_type)
     assert result.payload == payload
     assert_type_equality(result.payload, payload)
+
+
+def test_decode_perf():
+    for cmd_type, factory in [(Transactions, BaseTransactionFieldsFactory),
+                              (BlockBodiesV65, BlockBodyFactory)]:
+        for snappy_support in (True, False):
+            print("\n======= " + cmd_type.__name__ + "(snappy=" + str(snappy_support) + ") =======")
+            for nitems in (1, 10, 100, 500, 1000):
+                _measure_decode_perf(nitems, cmd_type, factory, snappy_support)
+
+
+def _measure_decode_perf(nitems, cmd_type, factory, snappy_support):
+    cmd = cmd_type(tuple(factory.create_batch(nitems)))
+    message = cmd.encode(cmd_type.protocol_command_id, snappy_support)
+    timer = Timer()
+    for _ in range(10):
+        cmd_type.decode(message, snappy_support=snappy_support)
+    print("%d items (msg len: %d): %.5f" % (
+        nitems,
+        len(message.body) + len(message.header),
+        timer.elapsed / 10)
+    )
