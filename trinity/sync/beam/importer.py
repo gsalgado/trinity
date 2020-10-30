@@ -573,6 +573,11 @@ class BlockImportServer(Service):
 
         loop = asyncio.get_event_loop()
         async for event in event_bus.stream(DoStatelessBlockImport):
+            # TODO?
+            # If we have witness hashes for this block in our DB, but not the actual trie
+            # nodes, wait a bit or fire a CollectMissingTrieNodes event.
+            # If no witness hashes in our DB, call fetch_witnesses() and wait for trie nodes
+
             # launch in new thread, so we don't block the event loop!
             import_completion = loop.run_in_executor(
                 # Maybe build the pausing chain inside the new process?
@@ -765,6 +770,14 @@ class BlockPreviewServer(Service):
                 if event.header.block_number % NUM_PREVIEW_SHARDS != self._shard_num:
                     continue
 
+                # TODO?
+                # If we have witness hashes for this block in our DB, but not the actual trie
+                # nodes, wait a bit or fire a CollectMissingTrieNodes event.
+                # If no witness hashes in our DB, call fetch_witnesses() and wait for trie nodes
+
+                # XXX: Will need to move all of the code below into a separate coroutine so that
+                # we can run multiple block previews in parallel. That wouldn't be possible
+                # otherwise because we're now waiting for the response to CollectMissingTrieNodes
                 self.logger.debug(
                     "DoStatelessBlockPreview-%d is previewing new block: %s",
                     self._shard_num,
